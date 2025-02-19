@@ -1,5 +1,5 @@
 # Team 3 - Congressional Bills Data Project
-
+#### Members: Kashish Kumar, Yinhan Wang, Hanzhong Yang, Ran Yan
 This repository contains our full workflow for collecting, cleaning, and exploring congressional bill data from the 118th session.
 
 ## Overview
