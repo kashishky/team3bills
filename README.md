@@ -2,8 +2,6 @@
 
 This repository contains our full workflow for collecting, cleaning, and exploring congressional bill data from the 118th session.
 
----
-
 ## Overview
 
 1. **Raw Scraping (`scrape.py`)**  
@@ -20,7 +18,6 @@ This repository contains our full workflow for collecting, cleaning, and explori
      - Summary statistics & distributions
      - Advanced visualizations (e.g., bar charts, histograms, parallel coordinates, etc.)
      - Feature engineering steps such as PCA, K-means clustering, sponsor/committee analysis, and more.
----
 
 ## Background on Scraping
 We scraped our data from a government website that displays details about bills in Congress (e.g., sponsors, cosponsors, committees, voting info). The `scrape.py` script systematically checks bill pages for a range of bill prefixes (`hr`, `s`, `hres`, `sres`, `hjres`, `sjres`) and tries to parse each one.  
@@ -28,8 +25,6 @@ We scraped our data from a government website that displays details about bills 
 ### Key Points:
 - We rely on HTML structure to extract each bill’s metadata, sponsor info, committees, and any available votes.  
 - We carefully handle missing or irregular data (not every bill has a recorded vote, not every sponsor is available, etc.).
-
----
 
 ## File Descriptions
 
@@ -47,8 +42,6 @@ We scraped our data from a government website that displays details about bills 
   - Performs in-depth EDA and advanced feature engineering steps (PCA, clustering, visualization, etc.).
   - Provides advanced insights and can be used as an input for ML models.
 
----
-
 ## How to Run
 
 1. **Clone or download** this repo.  
@@ -62,5 +55,3 @@ We scraped our data from a government website that displays details about bills 
 5. **EDA & Feature Engineering**:  
    1. Open **`eda_featureeng.ipynb`** and run the cells.  
    2. This will produce visualizations, summary stats, PCA/clustering results, and more.  
-
----
