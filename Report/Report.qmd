@@ -1,0 +1,197 @@
+---
+title: "Congressional Bills Data Project Report"
+author: "Team 3"
+date: "2025-02-19"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 3
+---
+
+# Introduction and Dataset Overview
+
+This report presents an extensive, step-by-step account of how our team gathered and analyzed legislative data from the 118th session of the U.S. Congress. The principal objective was to collect detailed attributes about congressional bills—sponsors, cosponsors, committees, subject categories, and voting outcomes—and transform them into a robust, structured dataset suitable for advanced analysis.
+
+The core dataset consists of hundreds of bills, reflecting a wide range of legislative activity. It merges textual information (bill titles, sponsor names, status descriptions) with numeric or date-based elements (number of cosponsors, date of introduction, vote outcomes). A key challenge is dealing with the abundance of categorical data (e.g., sponsor names, committees, status labels, subject tags). Our methodology addressed this through comprehensive cleaning, transformation, and feature engineering techniques.
+
+------------------------------------------------------------------------
+
+# Data Acquisition Methodology
+
+We first acquired the raw data using BeautifulSoup that targeted **GovTrack**, a public website tracking legislation. This script systematically iterates through possible bill identifiers (for example, “hr10” or “sres5”) and checks if a bill webpage is valid. If it is, the script retrieves the HTML content and extracts from the pages of the bold sections:
+
+-   **Overview Elements**: Bill title, a brief summary, sponsor information, and a textual field showing how many cosponsors or cosponsor remarks were given.\
+-   **Detail Elements**: Committees assigned, recorded votes (if any), related bills, and subject areas.\
+-   **Cosponsor Lists**: In some cases, there is a complete listing of cosponsors, which we transform into a single string or further processed for cosponsor counts.
+
+The resulting output from this scraping step is a CSV file containing raw legislative data. Because different bill types (House bills, Senate bills, joint resolutions, standard resolutions, etc.) can appear in varying states (introduced, referred, passed, or never acted upon), the dataset includes many partial or missing fields—particularly for bills that did not move past the introduction phase. This variability underscores the complexity of real-world legislative data.
+
+In capturing this broad range of bills, we ensured a sufficiently large dataset covering multiple committees, a wide variety of sponsors, and subject tags from key legislative domains. However, many bills never progress far enough to accumulate cosponsors or reach a floor vote, leading to numerous missing or inconsistent fields, requiring a thorough cleaning process next.
+
+------------------------------------------------------------------------
+
+# Cleaning and Preprocessing Steps
+
+Three separate scripts or notebooks originally handled our cleaning, transformation, and partial exploration tasks. We combined their logic into a single overarching workflow to produce a consolidated dataset:
+
+1.  **Initial Data Loading and Basic Fixes**
+
+    -   We read the raw scraped CSV. Because many text fields, such as “Vote Result,” “Status,” and “Subjects,” contain multiple pieces of information, the data needed to be parsed carefully. For instance, the `Status` column might include both a short descriptor and a date in parentheses. We extracted those components into two separate columns: one for a cleaned status (like “Introduced” or “Failed”) and one for a status date where it existed.\
+    -   Date fields (like `Introduced` or `Vote Date`) appear in inconsistent text formats. We converted them into a standardized date format to facilitate timeline calculations and comparisons.
+
+2.  **Managing Missing Values and Anomalies**
+
+    -   Numerous bills lacked cosponsor data if they never garnered any cosponsors. We allowed for a “0 cosponsors” logic, while also creating a binary indicator (`Has Cosponsors`) for bills with at least one cosponsor.\
+    -   In some cases, text-based fields inadvertently contained date strings or partially corrupted references. For example, the `Vote Result` column might have an actual date. The code replaced these anomalies by shifting the date to the `Vote Date` column and setting the `Vote Result` to a standardized placeholder.\
+
+![Missing Values Heatmap- Before](Missing_v_pre.png){fig-align="center" width="70%"} \ ![Missing Values Heatmap- Before](Missing_2.png){fig-align="center" width="70%"}
+
+3.  **One-Hot Encoding and Expansion of Categorical Features**
+
+    -   The “Subjects” column, if populated, might list multiple topics for each bill (e.g., “Taxation, Public Lands”). We separated each topic into its own binary indicator column. This drastically expanded the dataset’s width, creating many sparse columns.\
+    -   Sponsor and Committee fields, which are also categorical, were label-encoded in the final step (though we could have used one-hot encoding, label encoding (in our EDA jupyter notebook) was chosen to keep the dataset size manageable and to support correlation or tree-based analysis more directly).
+
+4.  **Reducing Near-Zero Variance Predictors**
+
+    -   Because we ended up with a substantial number of columns (particularly from subjects), certain columns displayed no variation (all zeros or nearly all zeros). Using a variance threshold, we automatically dropped columns that contributed no useful information, adhering to best practices from the lectures regarding zero or near-zero variance features.
+
+5.  **K-Nearest Neighbors (KNN) Imputation**
+
+    -   For numeric fields that remained incomplete after the above cleaning steps, we employed KNN-based imputation. This approach helped ensure the missing values were imputed in a way that used similarities across multiple attributes, rather than relying on a global mean or median.\
+    -   Also for the 'object' columns we used mode to perform the imputation as this was categorical fields noted in Lecture 2. However, we recognize that imputing these columns is not necessarily conducive towards a formal analysis considering the subject matter of our dataset. Regardless, this was appropriate for the conditions of this assignment.
+6.  **Outlier Detection and Handling**
+
+    -   Outliers in `Cosponsor Count` were addressed using Winsorization rather than removal. Specifically, values were capped at the 5th and 95th percentiles to limit extreme distortions in distribution without losing meaningful data.\
+    -   This was particularly important since extreme values might reflect procedural anomalies rather than data errors. The decision to use Winsorization instead of outright deletion preserved data integrity while mitigating potential bias caused by extreme values.
+
+::: center
+![Composer count before winsorization](knn1.png){width="70%"} ![Composer count after winsorization](knn2.png){width="70%"}
+:::
+
+By the end of this process, we produced a well-structured file, **`final_congress_bills_data.csv`**, containing carefully curated columns for bills, sponsors, committees, vote data, cosponsors, and subject tags. The main rationale for each step was to standardize the variety of textual and numeric anomalies in the source data, reduce unhelpful columns, and create consistent, model-friendly features.
+
+------------------------------------------------------------------------
+
+# Exploratory Data Analysis (EDA)
+
+With a cleaned and feature-rich dataset, we turned to in-depth EDA in a separate notebook. This analysis aimed to uncover patterns in legislative sponsorship, committee activity, cosponsorship behavior, and ultimate bill outcomes.
+
+1.  **Initial Descriptive Statistics**
+    -   We examined how many bills exist post-cleaning and how many numeric vs. categorical columns remain. This step confirmed that bills without a floor vote remain common, reflecting typical legislative dynamics where many introductions never proceed to a recorded vote.
+2.  **Sponsor and Committee Distributions**
+    -   We observed that a small group of sponsors introduced the majority of bills. This finding is consistent with real-world legislative behavior, where a few motivated or high-profile lawmakers sponsor numerous pieces of legislation.\
+    -   Certain committees, such as Appropriations or Judiciary, had notably high activity. This concentration hints at subject areas or procedural roles that funnel many bills through specific committees.\
+        ![Top 10 sponsors](top10_spon.png){width="70%"}
+        ![sbuject](subject1.png){width="70%"}\
+3.  **Label Encoding of Bill Categories**
+    -   We extracted the bill category from the raw "Bill Number" using regular expressions. This allowed us to split the value into a Major Category (indicating whether the bill is from the House or Senate) and a Sub Category (denoting the type of bill, such as a standard bill or a resolution).\
+    -   After isolating these components, we applied label encoding to convert them into numeric values. This transformation preserved the categorical information while keeping the feature space compact, which was important given the high cardinality of other fields.\
+    -   The bar chart below illustrates how many items fall into each sub category for both the House and the Senate, showing that most standard bills come from the House, while a significant fraction of resolutions appear in both chambers.\
+        ![Top 10 sponsors](billcategory.png){width="70%"}
+4.  **Vote Timelines**
+    -   Using the `Introduced` and `Vote Date`, we calculated how long each bill took to progress to a vote (`Time to Vote`). A histogram of these durations revealed a wide variance, with some bills moving quickly (within days) and many never receiving a vote at all.\
+        ![Vote Timelines](vote_timeline.png){width="70%"}
+5.  **Vote Results and Differences**
+    -   For bills that received a vote, we extracted and categorized the vote outcomes (e.g., `Agreed`, `Failed`, or `No Result`) and computed a "Vote Difference" (the difference between yes votes and no votes). Bills that did receive a recorded vote often displayed a relatively narrow vote margin, though we also spotted some landslide outcomes. Meanwhile, many bills were labeled “No Result,” indicating they did not get a final floor vote.\
+    -   Analyzing the distribution of cosponsor counts showed that bills with higher cosponsor engagement correlated loosely with success, although causation cannot be definitively established from this alone.\
+        ![Vote result](vote_result.png){width="70%"}
+
+Overall, our EDA highlighted the imbalances of the legislative process, confirming that sponsor “hyperactivity,” committee bottlenecks, and the presence or absence of cosponsors can shape a bill’s trajectory. The necessity of advanced transformations (like label encoding and missing data imputation) became evident, as did the difficulty in deriving conclusive trends from partial or skewed data.
+
+------------------------------------------------------------------------
+
+# Feature Engineering: Methods and Rationale
+
+Beyond the fundamental cleaning and EDA, we pursued more advanced feature engineering to capture deeper structure in the data:
+
+1.  **Pearson Correlation Plots**
+    -   After finalizing the cleaned numerical features, we created correlation matrices to spot highly correlated pairs of variables. This was visualized as a heatmap, allowing us to see at a glance if any columns—such as `Cosponsor Count` and `Time to Vote`—were overly correlated with certain `Subjects`. Strong correlations inform decisions about which features to keep, drop, or combine. For instance, if several subject-related variables are essentially duplicates, a correlation heatmap can help identify redundancy before modeling. Regardless, we did not observe any conceptually similar `Subjects` as highly correlated. Correlation heatmaps were generated, as seen below, to detect feature pairs, particularly among subject-based, label encoded variables, and numeric legislative factors.\
+        ![correlation heatmap](correlation1.png){width="70%"} ![correlation heatmap](correlation2.png){width="70%"}
+2.  **Principal Component Analysis (PCA)**
+    -   Given the sheer volume of subject-based columns and other one-hot expansions, our dataset risked becoming unwieldy. PCA helps reduce dimensionality by identifying underlying principal components that explain most variance in the data.\
+    -   This is crucial to mitigate the impact of correlated or near-duplicate columns—an inevitable situation when dealing with tens or hundreds of subject indicators.\
+        ![PCA result](pca.png){width="70%"}
+3.  **Polynomial Features**
+    -   In pursuit of capturing potential nonlinear relationships, we tested generating interaction terms and squared terms for `Time to Vote` and `Cosponsor Count`. This helps uncover more complex patterns with regards to their level of correlation across subject areas.\
+    -   However, polynomial expansions can dramatically increase the feature space, so we combined them with PCA to keep the final representation tractable (see code segment prior to correlation plots).
+4.  **Clustering (K-Means) on PCA Outputs**
+    -   As an exploratory step, we used unsupervised clustering to see if certain types of bills naturally group together along lines of sponsor ideology, subject matter, or committees. By applying K-Means to the reduced PCA dimensions, we can identify possible “clusters” of bills.\
+    -   After forming clusters, we can investigate which committees or sponsors frequently appeared in each group. This approach can yield insights into legislative “themes”—for instance, a cluster dominated by defense-related topics or a cluster with bipartisan cosponsorship patterns.\
+        ![K-mean](kmean1.png){width="70%"}![K-mean](kmean2.png){width="70%"}![K-mean](cluster1.png){width="70%"}
+5.  **Binary Encoding of Vote Outcomes**
+    -   Another form of feature engineering previously mentioned involved simplifying vote outcomes (e.g., “Passed,” “Failed,” or “No Result” 0,1,2 respectively below) into a single numeric label or target variable for classification tasks. This is vital if we want to train predictive models to guess a bill’s success based on its attributes. We used this attribute on the k-means clusters shown below.\
+    -   Additionally, we computed a `Vote Difference` feature—essentially (yes votes – no votes)—for bills that did have a final vote. This numeric difference can help capture how contentious or supported a particular measure was.\
+        ![binary outcome](binary1.png){width="70%"}
+
+Each step was deliberate, addressing:
+
+-   **High Dimensionality** (using correlation plots followed by PCA).\
+-   **Potential Nonlinear Relationships** (using polynomial expansions).\
+-   **Patterns in Categorical Dominance** (using K-Means clusters or label-encoded outcomes).
+
+Though the assignment rubric didn’t explicitly require predictive modeling, these advanced transformations open the door to logistic regression, tree-based models, or other predictive frameworks in future work.
+
+------------------------------------------------------------------------
+
+# Summary of Key Findings
+
+Through data cleaning, exploration, and feature engineering, we uncovered several important themes:
+
+1.  A significant subset never progresses beyond introduction or committee referral, illuminating a reality of the legislative process rather than just data quality issues.
+
+2.  A minor fraction of legislators introduce the bulk of bills, possibly reflecting leadership roles or particularly engaged lawmakers.
+
+3.  Key committees—particularly those with broad jurisdiction—surface again and again, hinting at central legislative “choke points.”
+
+4.  Bills with many cosponsors exhibit somewhat higher success rates, consistent with the idea that broader support fosters legislative momentum.
+
+5.  While the one-hot encoding of subjects created many columns, the top few subjects repeatedly dominated the dataset, suggesting recurring policy focus areas in this congressional session.
+
+6.  Preliminary unsupervised exploration indicated some grouping of bills by subject matter or sponsor styles. Detailed cluster analysis could refine these findings further.
+
+These insights emerged only after careful data transformations and EDA. The shortfalls—such as incomplete votes and the large number of “No Result” statuses—are part of genuine legislative constraints, not just flaws in data handling.
+
+------------------------------------------------------------------------
+
+# Challenges and Future Recommendations
+
+## Challenges
+
+1.  **Inherent Data Gaps**\
+    The legislative process naturally leaves many bills without final votes or extensive cosponsor data, complicating attempts at a universal analysis of “success.”
+
+2.  **Categorical Explosion**\
+    Incorporating all subject tags led to substantial dimensional expansion. This made techniques like PCA essential to avoid unwieldy data frames.
+
+3.  **Site Dependency**\
+    The scraping process depends on a stable site structure. If GovTrack changes page layouts or HTML tags, future runs may break.
+
+## Future Directions
+
+1.  **API Integration**\
+    If GovTrack or another platform provides an official API, hooking into that might yield more stable, structured data with fewer missing values.
+
+2.  **Predictive Modeling**\
+    With the dataset preprocessed, we can attempt logistic regression, gradient boosting, or random forests on the question: “Does this bill pass or fail?” We would consider sponsor features, committees, and cosponsor counts as potential predictors.
+
+3.  **Temporal/Historical Comparisons**\
+    Scraping older sessions of Congress could allow time-series or comparative analysis, showing how legislative focus areas shift from session to session.
+
+Overall, these recommendations flow naturally from the challenges identified. Despite the complexities, our dataset is now robust enough for various extended analyses.
+
+------------------------------------------------------------------------
+
+## Github
+
+The GitHub repsoitory has been shared directly with Professor Pijyan and is Public under <https://github.com/kashishky/team3bills>.
+
+------------------------------------------------------------------------
+
+## Member Contributions
+
+#### All members contributed according to our pre-arrangement.
+
+-   Kashish Kumar: Scraping, EDA/Feature Engineering, GitHub management
+-   Yinhan Wang: EDA/Feature Engineering, GitHub Management
+-   Hanzhong Yang: Missingness, Imputation, Outliers,Report Refining
+-   Ran Yan: Preprocessing, Variance Thresholding

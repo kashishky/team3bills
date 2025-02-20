@@ -100,33 +100,48 @@ ul.task-list li input[type="checkbox"] {
 <h1>Cleaning and Preprocessing Steps</h1>
 <p>Three separate scripts or notebooks originally handled our cleaning, transformation, and partial exploration tasks. We combined their logic into a single overarching workflow to produce a consolidated dataset:</p>
 <ol type="1">
-<li><strong>Initial Data Loading and Basic Fixes</strong>
+<li><p><strong>Initial Data Loading and Basic Fixes</strong></p>
 <ul>
 <li>We read the raw scraped CSV. Because many text fields, such as “Vote Result,” “Status,” and “Subjects,” contain multiple pieces of information, the data needed to be parsed carefully. For instance, the <code>Status</code> column might include both a short descriptor and a date in parentheses. We extracted those components into two separate columns: one for a cleaned status (like “Introduced” or “Failed”) and one for a status date where it existed.<br>
 </li>
 <li>Date fields (like <code>Introduced</code> or <code>Vote Date</code>) appear in inconsistent text formats. We converted them into a standardized date format to facilitate timeline calculations and comparisons.</li>
 </ul></li>
-<li><strong>Managing Missing Values and Anomalies</strong>
+<li><p><strong>Managing Missing Values and Anomalies</strong></p>
 <ul>
 <li>Numerous bills lacked cosponsor data if they never garnered any cosponsors. We allowed for a “0 cosponsors” logic, while also creating a binary indicator (<code>Has Cosponsors</code>) for bills with at least one cosponsor.<br>
 </li>
-<li>In some cases, text-based fields inadvertently contained date strings or partially corrupted references. For example, the <code>Vote Result</code> column might have an actual date. The code replaced these anomalies by shifting the date to the <code>Vote Date</code> column and setting the <code>Vote Result</code> to a standardized placeholder.</li>
+<li>In some cases, text-based fields inadvertently contained date strings or partially corrupted references. For example, the <code>Vote Result</code> column might have an actual date. The code replaced these anomalies by shifting the date to the <code>Vote Date</code> column and setting the <code>Vote Result</code> to a standardized placeholder.<br>
+</li>
 </ul></li>
-<li><strong>One-Hot Encoding and Expansion of Categorical Features</strong>
+</ol>
+<p><img src="Missing_v_pre.png" class="img-fluid quarto-figure quarto-figure-center" style="width:70.0%" alt="Missing Values Heatmap- Before"> &nbsp;<img src="Missing_2.png" class="img-fluid quarto-figure quarto-figure-center" style="width:70.0%" alt="Missing Values Heatmap- Before"></p>
+<ol start="3" type="1">
+<li><p><strong>One-Hot Encoding and Expansion of Categorical Features</strong></p>
 <ul>
 <li>The “Subjects” column, if populated, might list multiple topics for each bill (e.g., “Taxation, Public Lands”). We separated each topic into its own binary indicator column. This drastically expanded the dataset’s width, creating many sparse columns.<br>
 </li>
 <li>Sponsor and Committee fields, which are also categorical, were label-encoded in the final step (though we could have used one-hot encoding, label encoding (in our EDA jupyter notebook) was chosen to keep the dataset size manageable and to support correlation or tree-based analysis more directly).</li>
 </ul></li>
-<li><strong>Reducing Near-Zero Variance Predictors</strong>
+<li><p><strong>Reducing Near-Zero Variance Predictors</strong></p>
 <ul>
 <li>Because we ended up with a substantial number of columns (particularly from subjects), certain columns displayed no variation (all zeros or nearly all zeros). Using a variance threshold, we automatically dropped columns that contributed no useful information, adhering to best practices from the lectures regarding zero or near-zero variance features.</li>
 </ul></li>
-<li><strong>K-Nearest Neighbors (KNN) Imputation</strong>
+<li><p><strong>K-Nearest Neighbors (KNN) Imputation</strong></p>
 <ul>
-<li>For numeric fields that remained incomplete after the above cleaning steps, we employed KNN-based imputation. This approach helped ensure the missing values were imputed in a way that used similarities across multiple attributes, rather than relying on a global mean or median. Also for the ‘object’ columns we used mode to perform the imputation as this was categorical fields noted in Lecture 2. However, we recognize that imputing these columns is not necessarily conducive towards a formal analysis considering the subject matter of our dataset. Regardless, this was appropriate for the conditions of this assignment.</li>
+<li>For numeric fields that remained incomplete after the above cleaning steps, we employed KNN-based imputation. This approach helped ensure the missing values were imputed in a way that used similarities across multiple attributes, rather than relying on a global mean or median.<br>
+</li>
+<li>Also for the ‘object’ columns we used mode to perform the imputation as this was categorical fields noted in Lecture 2. However, we recognize that imputing these columns is not necessarily conducive towards a formal analysis considering the subject matter of our dataset. Regardless, this was appropriate for the conditions of this assignment.</li>
+</ul></li>
+<li><p><strong>Outlier Detection and Handling</strong></p>
+<ul>
+<li>Outliers in <code>Cosponsor Count</code> were addressed using Winsorization rather than removal. Specifically, values were capped at the 5th and 95th percentiles to limit extreme distortions in distribution without losing meaningful data.<br>
+</li>
+<li>This was particularly important since extreme values might reflect procedural anomalies rather than data errors. The decision to use Winsorization instead of outright deletion preserved data integrity while mitigating potential bias caused by extreme values.</li>
 </ul></li>
 </ol>
+<div class="center">
+<p><img src="knn1.png" class="img-fluid" style="width:70.0%" alt="Composer count before winsorization"> <img src="knn2.png" class="img-fluid" style="width:70.0%" alt="Composer count after winsorization"></p>
+</div>
 <p>By the end of this process, we produced a well-structured file, <strong><code>final_congress_bills_data.csv</code></strong>, containing carefully curated columns for bills, sponsors, committees, vote data, cosponsors, and subject tags. The main rationale for each step was to standardize the variety of textual and numeric anomalies in the source data, reduce unhelpful columns, and create consistent, model-friendly features.</p>
 <hr>
 </section>
@@ -136,27 +151,36 @@ ul.task-list li input[type="checkbox"] {
 <ol type="1">
 <li><strong>Initial Descriptive Statistics</strong>
 <ul>
-<li>We examined how many bills exist post-cleaning, how many numeric vs.&nbsp;categorical columns remain, and how often certain fields are missing. This step confirmed that bills without a floor vote remain common, reflecting typical legislative dynamics where many introductions never proceed to a recorded vote.</li>
+<li>We examined how many bills exist post-cleaning and how many numeric vs.&nbsp;categorical columns remain. This step confirmed that bills without a floor vote remain common, reflecting typical legislative dynamics where many introductions never proceed to a recorded vote.</li>
 </ul></li>
 <li><strong>Sponsor and Committee Distributions</strong>
 <ul>
 <li>We observed that a small group of sponsors introduced the majority of bills. This finding is consistent with real-world legislative behavior, where a few motivated or high-profile lawmakers sponsor numerous pieces of legislation.<br>
 </li>
-<li>Certain committees, such as Appropriations or Judiciary, had notably high activity. This concentration hints at subject areas or procedural roles that funnel many bills through specific committees.</li>
+<li>Certain committees, such as Appropriations or Judiciary, had notably high activity. This concentration hints at subject areas or procedural roles that funnel many bills through specific committees.<br>
+<img src="top10_spon.png" class="img-fluid" style="width:70.0%" alt="Top 10 sponsors"> <img src="subject1.png" class="img-fluid" style="width:70.0%" alt="sbuject"><br>
+</li>
+</ul></li>
+<li><strong>Label Encoding of Bill Categories</strong>
+<ul>
+<li>We extracted the bill category from the raw “Bill Number” using regular expressions. This allowed us to split the value into a Major Category (indicating whether the bill is from the House or Senate) and a Sub Category (denoting the type of bill, such as a standard bill or a resolution).<br>
+</li>
+<li>After isolating these components, we applied label encoding to convert them into numeric values. This transformation preserved the categorical information while keeping the feature space compact, which was important given the high cardinality of other fields.<br>
+</li>
+<li>The bar chart below illustrates how many items fall into each sub category for both the House and the Senate, showing that most standard bills come from the House, while a significant fraction of resolutions appear in both chambers.<br>
+<img src="billcategory.png" class="img-fluid" style="width:70.0%" alt="Top 10 sponsors"></li>
 </ul></li>
 <li><strong>Vote Timelines</strong>
 <ul>
-<li>Using the introduced and vote dates (where available), we calculated how long each bill took to progress to a vote. A histogram of these durations revealed a wide variance, with some bills moving quickly (within days) and many never receiving a vote at all.</li>
+<li>Using the <code>Introduced</code> and <code>Vote Date</code>, we calculated how long each bill took to progress to a vote (<code>Time to Vote</code>). A histogram of these durations revealed a wide variance, with some bills moving quickly (within days) and many never receiving a vote at all.<br>
+<img src="vote_timeline.png" class="img-fluid" style="width:70.0%" alt="Vote Timelines"></li>
 </ul></li>
 <li><strong>Vote Results and Differences</strong>
 <ul>
-<li>Bills that did receive a recorded vote often displayed a relatively narrow vote margin, though we also spotted some landslide outcomes. Meanwhile, many bills were labeled “No Result,” indicating they did not get a final floor vote.<br>
+<li>For bills that received a vote, we extracted and categorized the vote outcomes (e.g., <code>Agreed</code>, <code>Failed</code>, or <code>No Result</code>) and computed a “Vote Difference” (the difference between yes votes and no votes). Bills that did receive a recorded vote often displayed a relatively narrow vote margin, though we also spotted some landslide outcomes. Meanwhile, many bills were labeled “No Result,” indicating they did not get a final floor vote.<br>
 </li>
-<li>Analyzing the distribution of cosponsor counts showed that bills with higher cosponsor engagement correlated loosely with success, although causation cannot be definitively established from this alone.</li>
-</ul></li>
-<li><strong>Subject Category Prevalence</strong>
-<ul>
-<li>After the extensive encoding, we identified which policy areas or subjects occurred most frequently. A handful of broad topics dominated. This step underscored the legislative focus areas in the dataset.</li>
+<li>Analyzing the distribution of cosponsor counts showed that bills with higher cosponsor engagement correlated loosely with success, although causation cannot be definitively established from this alone.<br>
+<img src="vote_result.png" class="img-fluid" style="width:70.0%" alt="Vote result"></li>
 </ul></li>
 </ol>
 <p>Overall, our EDA highlighted the imbalances of the legislative process, confirming that sponsor “hyperactivity,” committee bottlenecks, and the presence or absence of cosponsors can shape a bill’s trajectory. The necessity of advanced transformations (like label encoding and missing data imputation) became evident, as did the difficulty in deriving conclusive trends from partial or skewed data.</p>
@@ -166,33 +190,37 @@ ul.task-list li input[type="checkbox"] {
 <h1>Feature Engineering: Methods and Rationale</h1>
 <p>Beyond the fundamental cleaning and EDA, we pursued more advanced feature engineering to capture deeper structure in the data:</p>
 <ol type="1">
-<li><strong>Correlation Plots</strong>
+<li><strong>Pearson Correlation Plots</strong>
 <ul>
-<li>After finalizing the cleaned numerical features, we created correlation matrices to spot highly correlated pairs of variables. This was visualized as a heatmap, allowing us to see at a glance if any columns—such as cosponsor count and time-to-vote—were overly correlated. Strong correlations inform decisions about which features to keep, drop, or combine. For instance, if several subject-related variables are essentially duplicates, a correlation heatmap can help identify redundancy before modeling.</li>
+<li>After finalizing the cleaned numerical features, we created correlation matrices to spot highly correlated pairs of variables. This was visualized as a heatmap, allowing us to see at a glance if any columns—such as <code>Cosponsor Count</code> and <code>Time to Vote</code>—were overly correlated with certain <code>Subjects</code>. Strong correlations inform decisions about which features to keep, drop, or combine. For instance, if several subject-related variables are essentially duplicates, a correlation heatmap can help identify redundancy before modeling. Regardless, we did not observe any conceptually similar <code>Subjects</code> as highly correlated. Correlation heatmaps were generated, as seen below, to detect feature pairs, particularly among subject-based, label encoded variables, and numeric legislative factors.<br>
+<img src="correlation1.png" class="img-fluid" style="width:70.0%" alt="correlation heatmap"> <img src="correlation2.png" class="img-fluid" style="width:70.0%" alt="correlation heatmap"></li>
 </ul></li>
 <li><strong>Principal Component Analysis (PCA)</strong>
 <ul>
 <li>Given the sheer volume of subject-based columns and other one-hot expansions, our dataset risked becoming unwieldy. PCA helps reduce dimensionality by identifying underlying principal components that explain most variance in the data.<br>
 </li>
-<li>This is crucial to mitigate the impact of correlated or near-duplicate columns—an inevitable situation when dealing with tens or hundreds of subject indicators.</li>
+<li>This is crucial to mitigate the impact of correlated or near-duplicate columns—an inevitable situation when dealing with tens or hundreds of subject indicators.<br>
+<img src="pca.png" class="img-fluid" style="width:70.0%" alt="PCA result"></li>
 </ul></li>
 <li><strong>Polynomial Features</strong>
 <ul>
-<li>In pursuit of capturing potential nonlinear relationships, we tested generating interaction terms and squared terms for Time to Vote and Cosponsor Count. This might help uncover more complex patterns with regards to their level of correlation across subject areas.<br>
+<li>In pursuit of capturing potential nonlinear relationships, we tested generating interaction terms and squared terms for <code>Time to Vote</code> and <code>Cosponsor Count</code>. This helps uncover more complex patterns with regards to their level of correlation across subject areas.<br>
 </li>
-<li>However, polynomial expansions can dramatically increase the feature space, so we combined them with PCA to keep the final representation tractable (see code prior to correlation plots).</li>
+<li>However, polynomial expansions can dramatically increase the feature space, so we combined them with PCA to keep the final representation tractable (see code segment prior to correlation plots).</li>
 </ul></li>
 <li><strong>Clustering (K-Means) on PCA Outputs</strong>
 <ul>
 <li>As an exploratory step, we used unsupervised clustering to see if certain types of bills naturally group together along lines of sponsor ideology, subject matter, or committees. By applying K-Means to the reduced PCA dimensions, we can identify possible “clusters” of bills.<br>
 </li>
-<li>After forming clusters, we can investigate which committees or sponsors frequently appeared in each group. This approach can yield insights into legislative “themes”—for instance, a cluster dominated by defense-related topics or a cluster with bipartisan cosponsorship patterns.</li>
+<li>After forming clusters, we can investigate which committees or sponsors frequently appeared in each group. This approach can yield insights into legislative “themes”—for instance, a cluster dominated by defense-related topics or a cluster with bipartisan cosponsorship patterns.<br>
+<img src="kmean1.png" class="img-fluid" style="width:70.0%" alt="K-mean"><img src="kmean2.png" class="img-fluid" style="width:70.0%" alt="K-mean"><img src="cluster1.png" class="img-fluid" style="width:70.0%" alt="K-mean"></li>
 </ul></li>
 <li><strong>Binary Encoding of Vote Outcomes</strong>
 <ul>
-<li>Another form of feature engineering involved simplifying vote outcomes (e.g., “Passed,” “Failed,” or “No Result”) into a single numeric label or target variable for classification tasks. This is vital if we want to train predictive models to guess a bill’s success based on its attributes.<br>
+<li>Another form of feature engineering previously mentioned involved simplifying vote outcomes (e.g., “Passed,” “Failed,” or “No Result” 0,1,2 respectively below) into a single numeric label or target variable for classification tasks. This is vital if we want to train predictive models to guess a bill’s success based on its attributes. We used this attribute on the k-means clusters shown below.<br>
 </li>
-<li>Additionally, we computed a “Vote Difference” feature—essentially (yes votes – no votes)—for bills that did have a final vote. This numeric difference can help capture how contentious or supported a particular measure was.</li>
+<li>Additionally, we computed a <code>Vote Difference</code> feature—essentially (yes votes – no votes)—for bills that did have a final vote. This numeric difference can help capture how contentious or supported a particular measure was.<br>
+<img src="binary1.png" class="img-fluid" style="width:70.0%" alt="binary outcome"></li>
 </ul></li>
 </ol>
 <p>Each step was deliberate, addressing:</p>
@@ -258,7 +286,7 @@ Scraping older sessions of Congress could allow time-series or comparative analy
 <ul>
 <li>Kashish Kumar: Scraping, EDA/Feature Engineering, GitHub management</li>
 <li>Yinhan Wang: EDA/Feature Engineering, GitHub Management</li>
-<li>Hanzhong Yang: Missingness, Imputation, Outliers</li>
+<li>Hanzhong Yang: Missingness, Imputation, Outliers,Report Refining</li>
 <li>Ran Yan: Preprocessing, Variance Thresholding</li>
 </ul>
 </section>
